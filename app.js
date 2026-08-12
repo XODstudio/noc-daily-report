@@ -1,5 +1,5 @@
 // --- KONEKSI SUPABASE ---
-const SUPABASE_URL = 'https://piuwcjsdkcbtzwdwblor.supabase.co/rest/v1/';
+const SUPABASE_URL = 'https://piuwcjsdkcbtzwdwblor.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_xLcGMLD9nT_8RMkPe6dsgg_kOsslm0c';
 
 // Inisialisasi Supabase Client
