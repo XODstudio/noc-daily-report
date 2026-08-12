@@ -2,13 +2,12 @@
 const SUPABASE_URL = 'https://piuwcjsdkcbtzwdwblor.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_xLcGMLD9nT_8RMkPe6dsgg_kOsslm0c';
 
-// Inisialisasi Supabase Client
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // --- State Management ---
 let reports = JSON.parse(localStorage.getItem('noc_reports')) || [];
 let pendingTasks = JSON.parse(localStorage.getItem('noc_pending_tasks')) || [];
-let pastedImageBase64 = null;
+let pastedImagesArray = []; // Menggunakan Array untuk Multiple Images!
 let currentFilter = 'ALL';
 
 // --- Element Selectors ---
@@ -19,8 +18,6 @@ const prContainer = document.getElementById('pr-container');
 const pasteArea = document.getElementById('paste-area');
 const pastePlaceholder = document.getElementById('paste-placeholder');
 const pastePreviewContainer = document.getElementById('paste-preview-container');
-const pastePreview = document.getElementById('paste-preview');
-const btnRemovePaste = document.getElementById('btn-remove-paste');
 const modal = document.getElementById('image-modal');
 const modalImgSrc = document.getElementById('modal-img-src');
 const modalCaption = document.getElementById('modal-caption');
@@ -32,37 +29,88 @@ const formattedDate = new Date().toLocaleDateString('id-ID', {
 document.getElementById('current-date').innerText = formattedDate;
 document.getElementById('print-date').innerText = formattedDate;
 
-// --- FUNGSI UPLOAD FOTO KE SUPABASE STORAGE ---
-async function uploadToSupabase(fileOrBase64) {
-  if (!fileOrBase64) return null;
+// --- FUNGSI UPLOAD BANYAK FOTO KE SUPABASE ---
+async function uploadMultipleToSupabase(imagesArray) {
+  if (!imagesArray || imagesArray.length === 0) return [];
 
-  try {
-    let fileToUpload = fileOrBase64;
-    // Ubah Base64 (Clipboard/Ctrl+V) menjadi Blob File jika diperlukan
-    if (typeof fileOrBase64 === 'string' && fileOrBase64.startsWith('data:image')) {
-      const res = await fetch(fileOrBase64);
-      fileToUpload = await res.blob();
+  const uploadPromises = imagesArray.map(async (fileOrBase64, index) => {
+    try {
+      let fileToUpload = fileOrBase64;
+      if (typeof fileOrBase64 === 'string' && fileOrBase64.startsWith('data:image')) {
+        const res = await fetch(fileOrBase64);
+        fileToUpload = await res.blob();
+      }
+
+      const fileName = `noc_${Date.now()}_${index}.png`;
+
+      const { data, error } = await supabaseClient.storage
+        .from('noc-images')
+        .upload(fileName, fileToUpload, { contentType: 'image/png' });
+
+      if (error) throw error;
+
+      const { data: publicUrlData } = supabaseClient.storage
+        .from('noc-images')
+        .getPublicUrl(fileName);
+
+      return publicUrlData.publicUrl;
+    } catch (err) {
+      console.error('Gagal upload gambar ke Supabase:', err);
+      return null;
     }
+  });
 
-    const fileName = `noc_${Date.now()}.png`;
+  const results = await Promise.all(uploadPromises);
+  return results.filter(url => url !== null);
+}
 
-    // Upload ke bucket 'noc-images'
-    const { data, error } = await supabaseClient.storage
-      .from('noc-images')
-      .upload(fileName, fileToUpload, { contentType: 'image/png' });
-
-    if (error) throw error;
-
-    // Dapatkan URL Publik
-    const { data: publicUrlData } = supabaseClient.storage
-      .from('noc-images')
-      .getPublicUrl(fileName);
-
-    return publicUrlData.publicUrl; // Mengembalikan URL Foto Publik
-  } catch (err) {
-    console.error('Gagal upload ke Supabase Storage:', err);
-    return fileOrBase64; // Fallback ke lokal jika gagal
+// --- CTRL + V (Paste Multiple Screenshots) ---
+pasteArea.addEventListener('paste', (e) => {
+  const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+  for (let item of items) {
+    if (item.type.indexOf('image') === 0) {
+      const blob = item.getAsFile();
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        pastedImagesArray.push(event.target.result); // Tambah foto ke Array
+        renderPastePreviews();
+      };
+      reader.readAsDataURL(blob);
+    }
   }
+});
+
+function renderPastePreviews() {
+  if (pastedImagesArray.length === 0) {
+    pastePlaceholder.classList.remove('hidden');
+    pastePreviewContainer.classList.add('hidden');
+    pastePreviewContainer.innerHTML = '';
+    return;
+  }
+
+  pastePlaceholder.classList.add('hidden');
+  pastePreviewContainer.classList.remove('hidden');
+  pastePreviewContainer.innerHTML = '';
+
+  pastedImagesArray.forEach((imgBase64, idx) => {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'relative group border border-slate-700 rounded p-1 bg-slate-950';
+    wrapper.innerHTML = `
+      <img src="${imgBase64}" class="h-16 w-20 object-cover rounded">
+      <button type="button" onclick="removePastedImg(${idx})" class="absolute -top-2 -right-2 bg-rose-600 text-white text-[10px] w-5 h-5 rounded-full flex items-center justify-center font-bold hover:bg-rose-500 shadow">✕</button>
+    `;
+    pastePreviewContainer.appendChild(wrapper);
+  });
+}
+
+function removePastedImg(index) {
+  pastedImagesArray.splice(index, 1);
+  renderPastePreviews();
+}
+
+function resetPasteArea() {
+  pastedImagesArray = [];
+  renderPastePreviews();
 }
 
 // --- SHORTCUT PRESET PROBLEM ---
@@ -78,36 +126,6 @@ function updateStats() {
   document.getElementById('stat-open').innerText = reports.filter(r => r.status === 'OPEN').length;
   document.getElementById('stat-critical').innerText = reports.filter(r => r.severity === 'Critical').length;
   document.getElementById('stat-pr').innerText = pendingTasks.length;
-}
-
-// --- CTRL + V (Paste Screenshot) ---
-pasteArea.addEventListener('paste', (e) => {
-  const items = (e.clipboardData || e.originalEvent.clipboardData).items;
-  for (let item of items) {
-    if (item.type.indexOf('image') === 0) {
-      const blob = item.getAsFile();
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        pastedImageBase64 = event.target.result;
-        pastePreview.src = pastedImageBase64;
-        pastePlaceholder.classList.add('hidden');
-        pastePreviewContainer.classList.remove('hidden');
-      };
-      reader.readAsDataURL(blob);
-    }
-  }
-});
-
-btnRemovePaste.addEventListener('click', (e) => {
-  e.stopPropagation();
-  resetPasteArea();
-});
-
-function resetPasteArea() {
-  pastedImageBase64 = null;
-  pastePreview.src = '';
-  pastePlaceholder.classList.remove('hidden');
-  pastePreviewContainer.classList.add('hidden');
 }
 
 // --- MODAL PREVIEW FOTO ---
@@ -157,9 +175,14 @@ function renderLogTable() {
     if (item.severity === 'Major') sevBadge = 'border-orange-500/50 bg-orange-500/10 text-orange-400';
     if (item.severity === 'Critical') sevBadge = 'border-rose-600/70 bg-rose-600/10 text-rose-300';
 
+    // Render Thumbnail Foto Banyak
     let imgPreview = `<span class="text-slate-600">-</span>`;
-    if (item.image) {
-      imgPreview = `<img src="${item.image}" alt="Bukti" class="h-9 w-14 object-cover rounded border border-slate-600 cursor-pointer hover:opacity-80 transition" onclick="openModal('${item.image}', '${item.ticketId}')">`;
+    if (item.images && item.images.length > 0) {
+      imgPreview = `<div class="flex gap-1 overflow-x-auto max-w-[120px]">`;
+      item.images.forEach((url) => {
+        imgPreview += `<img src="${url}" class="h-8 w-10 object-cover rounded border border-slate-600 cursor-pointer hover:opacity-80 transition" onclick="openModal('${url}', '${item.ticketId}')">`;
+      });
+      imgPreview += `</div>`;
     }
 
     const row = document.createElement('tr');
@@ -198,7 +221,7 @@ function renderPR() {
   });
 }
 
-// --- SUBMIT LOGIC DENGAN UPLOAD SUPABASE ---
+// --- SUBMIT LOGIC MULTIPLE UPLOAD ---
 reportForm.addEventListener('submit', async (e) => {
   e.preventDefault();
 
@@ -212,19 +235,19 @@ reportForm.addEventListener('submit', async (e) => {
   const fileInput = document.getElementById('ticket-image');
   const file = fileInput.files[0];
 
-  let rawImage = null;
-  if (pastedImageBase64) {
-    rawImage = pastedImageBase64;
-  } else if (file) {
-    rawImage = await new Promise((resolve) => {
+  let rawImagesToUpload = [...pastedImagesArray];
+
+  if (file) {
+    const fileBase64 = await new Promise((resolve) => {
       const reader = new FileReader();
       reader.onload = (evt) => resolve(evt.target.result);
       reader.readAsDataURL(file);
     });
+    rawImagesToUpload.push(fileBase64);
   }
 
-  // Upload ke Cloud Supabase
-  const uploadedImageUrl = await uploadToSupabase(rawImage);
+  // Upload Semua Gambar ke Supabase
+  const uploadedUrls = await uploadMultipleToSupabase(rawImagesToUpload);
 
   const newLog = {
     id: Date.now(),
@@ -234,7 +257,7 @@ reportForm.addEventListener('submit', async (e) => {
     severity: document.getElementById('severity').value,
     problem: document.getElementById('problem').value,
     action: document.getElementById('action').value,
-    image: uploadedImageUrl
+    images: uploadedUrls // Menyimpan Array URL Gambar
   };
 
   reports.push(newLog);
@@ -257,7 +280,6 @@ prForm.addEventListener('submit', (e) => {
   prForm.reset();
 });
 
-// Delete Functions
 function deleteReport(index) {
   if (confirm('Hapus log ini?')) {
     reports.splice(index, 1);
@@ -285,7 +307,7 @@ function filterLogs(type) {
   renderLogTable();
 }
 
-// COPY WHATSAPP WITH CLOUD LINK
+// COPY WHATSAPP WITH MULTIPLE CLOUD LINKS
 document.getElementById('btn-copy').addEventListener('click', () => {
   if (reports.length === 0) { alert('Belum ada log!'); return; }
 
@@ -300,7 +322,13 @@ document.getElementById('btn-copy').addEventListener('click', () => {
     txt += `   • Jam: ${item.time} WIB\n`;
     txt += `   • Problem: ${item.problem}\n`;
     txt += `   • Action: ${item.action || '-'}\n`;
-    if(item.image) txt += `   • Bukti Foto: ${item.image}\n`;
+    
+    if (item.images && item.images.length > 0) {
+      txt += `   • Bukti Foto (${item.images.length}):\n`;
+      item.images.forEach((url, idx) => {
+        txt += `     ${idx + 1}. ${url}\n`;
+      });
+    }
     txt += `\n`;
   });
 
@@ -313,7 +341,7 @@ document.getElementById('btn-copy').addEventListener('click', () => {
   }
 
   navigator.clipboard.writeText(txt).then(() => {
-    alert('Laporan berhasil di-copy! Link foto publik sudah otomatis menyatu di laporan WhatsApp.');
+    alert('Laporan berhasil di-copy! Semua link foto publik sudah tersusun rapi.');
   });
 });
 
