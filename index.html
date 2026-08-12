@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NOC Daily Report ULTIMATE</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+    .table-container { max-height: 420px; overflow-y: auto; }
+    
+    /* CSS Khusus Cetak / Print PDF */
+    @media print {
+      body { background: #ffffff !important; color: #000000 !important; padding: 0 !important; }
+      .no-print { display: none !important; }
+      .print-only { display: block !important; }
+      .table-container { max-height: none !important; overflow: visible !important; }
+      table { border-collapse: collapse !important; width: 100% !important; color: #000 !important; }
+      th, td { border: 1px solid #cbd5e1 !important; padding: 8px !important; color: #000 !important; }
+      th { background-color: #f1f5f9 !important; }
+    }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen p-4 md:p-8">
+
+  <!-- DOKUMEN HEADER KHUSUS PRINT PDF -->
+  <div class="hidden print-only mb-6">
+    <div class="border-b-2 border-slate-900 pb-2 mb-4 flex justify-between items-center">
+      <div>
+        <h1 class="text-xl font-bold text-black uppercase">Laporan Harian Operational NOC</h1>
+        <p class="text-xs text-slate-600">Dokumen Resmi Handover & Log Insiden Jaringan</p>
+      </div>
+      <div id="print-date" class="text-xs font-semibold text-slate-700"></div>
+    </div>
+  </div>
+
+  <div class="max-w-7xl mx-auto space-y-6">
+    
+    <!-- Header (No Print) -->
+    <header class="no-print flex flex-col md:flex-row justify-between items-start md:items-center border-b border-slate-700 pb-4 gap-4">
+      <div>
+        <h1 class="text-2xl font-bold text-sky-400">NOC Shift Report ULTIMATE</h1>
+        <p class="text-xs text-slate-400">Monitoring, Quick Shortcuts, Screenshot Paste & PDF Report</p>
+      </div>
+      <div id="current-date" class="text-right text-sm font-semibold text-slate-300"></div>
+    </header>
+
+    <!-- STATS / KPI WIDGETS (No Print) -->
+    <section class="no-print grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div class="bg-slate-800 p-4 rounded-xl border border-slate-700/80 shadow">
+        <p class="text-xs text-slate-400">Total Insiden</p>
+        <p id="stat-total" class="text-2xl font-extrabold text-slate-100 mt-1">0</p>
+      </div>
+      <div class="bg-slate-800 p-4 rounded-xl border border-slate-700/80 shadow">
+        <p class="text-xs text-rose-400 font-medium">Tiket OPEN</p>
+        <p id="stat-open" class="text-2xl font-extrabold text-rose-400 mt-1">0</p>
+      </div>
+      <div class="bg-slate-800 p-4 rounded-xl border border-slate-700/80 shadow">
+        <p class="text-xs text-orange-400 font-medium">Critical Level</p>
+        <p id="stat-critical" class="text-2xl font-extrabold text-orange-400 mt-1">0</p>
+      </div>
+      <div class="bg-slate-800 p-4 rounded-xl border border-slate-700/80 shadow">
+        <p class="text-xs text-yellow-400 font-medium">Pending PR</p>
+        <p id="stat-pr" class="text-2xl font-extrabold text-yellow-400 mt-1">0</p>
+      </div>
+    </section>
+
+    <!-- Grid Layout: Form & PR -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      
+      <!-- Form Input Insiden (No Print) -->
+      <section class="no-print bg-slate-800 p-5 rounded-xl border border-slate-700 shadow-lg lg:col-span-2">
+        <h2 class="text-lg font-semibold text-sky-400 mb-4">+ Tambah Log Insiden</h2>
+        <form id="report-form" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          
+          <div>
+            <label class="block text-xs text-slate-400 mb-1">Ticket / Device ID</label>
+            <input type="text" id="ticket-id" required placeholder="INC-9082 / Router-Core-01" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-sm text-slate-100 focus:outline-none focus:border-sky-500">
+          </div>
+
+          <div>
+            <label class="block text-xs text-slate-400 mb-1">Status Utama</label>
+            <select id="status" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-sm text-slate-100 focus:outline-none focus:border-sky-500">
+              <option value="OPEN">OPEN (🚨 Merah)</option>
+              <option value="IN PROGRESS">IN PROGRESS (⚠️ Kuning)</option>
+              <option value="RESOLVED">RESOLVED (✅ Hijau)</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-xs text-slate-400 mb-1">Tingkat Keparahan (Severity)</label>
+            <select id="severity" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-sm text-slate-100 focus:outline-none focus:border-sky-500">
+              <option value="Minor">Minor (Info)</option>
+              <option value="Major">Major (Degraded / Lemot)</option>
+              <option value="Critical">Critical (Total Down)</option>
+            </select>
+          </div>
+
+          <!-- Opsi File Upload -->
+          <div>
+            <label class="block text-xs text-slate-400 mb-1">Upload File Foto (Opsi 1)</label>
+            <input type="file" id="ticket-image" accept="image/*" class="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-xs text-slate-300 focus:outline-none focus:border-sky-500 file:bg-slate-700 file:text-slate-100 file:rounded file:border-0 file:px-2 file:py-1 file:mr-2">
+          </div>
+
+          <!-- Area Paste Screenshot (Ctrl + V) -->
+          <div class="md:col-span-2">
+            <label class="block text-xs text-slate-400 mb-1">Paste Screenshot (Opsi 2 - Ctrl + V)</label>
+            <div id="paste-area" tabindex="0" class="border-2 border-dashed border-slate-600 rounded-lg p-3 text-center bg-slate-900/50 cursor-pointer hover:border-sky-500 transition focus:outline-none focus:border-sky-500">
+              <p id="paste-placeholder" class="text-xs text-slate-400">
+                Klik area ini lalu pencet <span class="bg-slate-800 text-sky-400 px-1.5 py-0.5 rounded border border-slate-700 font-mono">Ctrl + V</span> buat nempel hasil Snipping Tool
+              </p>
+              <div id="paste-preview-container" class="hidden flex items-center justify-center gap-3">
+                <img id="paste-preview" src="" alt="Preview Clipboard" class="h-16 rounded border border-slate-600">
+                <button type="button" id="btn-remove-paste" class="text-xs text-rose-400 hover:underline">Hapus Screenshot</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Input Problem + Shortcut Buttons -->
+          <div class="md:col-span-2">
+            <div class="flex justify-between items-center mb-1">
+              <label class="block text-xs text-slate-400">Masalah (Problem)</label>
+              <!-- SHORTCUT PRESET CHIPS -->
+              <div class="flex gap-1 overflow-x-auto">
+                <button type="button" onclick="setPresetProblem('FO Cut Backbone')" class="text-[10px] bg-slate-700 hover:bg-sky-600 text-slate-300 px-1.5 py-0.5 rounded border border-slate-600 transition">+ FO Cut</button>
+                <button type="button" onclick="setPresetProblem('Power Failure / PLN Off')" class="text-[10px] bg-slate-700 hover:bg-sky-600 text-slate-300 px-1.5 py-0.5 rounded border border-slate-600 transition">+ Power Fail</button>
+                <button type="button" onclick="setPresetProblem('High Latency & Packet Loss')" class="text-[10px] bg-slate-700 hover:bg-sky-600 text-slate-300 px-1.5 py-0.5 rounded border border-slate-600 transition">+ High Latency</button>
+                <button type="button" onclick="setPresetProblem('Router / Switch Unreachable')" class="text-[10px] bg-slate-700 hover:bg-sky-600 text-slate-300 px-1.5 py-0.5 rounded border border-slate-600 transition">+ Device Down</button>
+              </div>
+            </div>
+            <input type="text" id="problem" required placeholder="Contoh: Fiber Cut ruas A-B, Latency High" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-sm text-slate-100 focus:outline-none focus:border-sky-500">
+          </div>
+
+          <div class="md:col-span-2">
+            <label class="block text-xs text-slate-400 mb-1">Tindakan (Action Taken)</label>
+            <textarea id="action" rows="2" placeholder="Contoh: Reroute ke link backup, eskalasi ke vendor" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-sm text-slate-100 focus:outline-none focus:border-sky-500"></textarea>
+          </div>
+
+          <div class="md:col-span-2 flex justify-end">
+            <button type="submit" class="bg-sky-600 hover:bg-sky-500 text-white font-medium px-5 py-2 rounded text-sm transition shadow-lg">Simpan Log</button>
+          </div>
+        </form>
+      </section>
+
+      <!-- Section PR Handover -->
+      <section class="bg-slate-800 p-5 rounded-xl border border-slate-700 shadow-lg flex flex-col justify-between space-y-4">
+        <div>
+          <h2 class="text-lg font-semibold text-yellow-400 mb-1">Pekerjaan Rumah (PR)</h2>
+          <p class="text-xs text-slate-400 mb-4 no-print">Pending task untuk handover shift selanjutnya</p>
+          <div class="space-y-2 max-h-60 overflow-y-auto" id="pr-container">
+            <!-- PR items -->
+          </div>
+        </div>
+        <form id="pr-form" class="no-print flex gap-2 pt-3 border-t border-slate-700">
+          <input type="text" id="pr-text" required placeholder="Tulis PR baru..." class="flex-grow bg-slate-900 border border-slate-700 rounded p-2 text-xs text-slate-100 focus:outline-none focus:border-yellow-500">
+          <button type="submit" class="bg-yellow-600 hover:bg-yellow-500 text-white text-xs px-3 py-2 rounded font-bold transition">+</button>
+        </form>
+      </section>
+
+    </div>
+
+    <!-- Filter & Table Section -->
+    <section class="space-y-4 pt-4 border-t border-slate-700">
+      <div class="no-print flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+        <div>
+          <h2 class="text-xl font-bold text-slate-200">Log Insiden Hari Ini</h2>
+          <!-- Filter Buttons -->
+          <div class="flex gap-1.5 mt-2">
+            <button onclick="filterLogs('ALL')" id="filter-all" class="px-2.5 py-1 text-xs rounded font-medium bg-sky-600 text-white">Semua</button>
+            <button onclick="filterLogs('OPEN')" id="filter-open" class="px-2.5 py-1 text-xs rounded font-medium bg-slate-800 text-slate-400 hover:text-white">🚨 Open Only</button>
+            <button onclick="filterLogs('CRITICAL')" id="filter-critical" class="px-2.5 py-1 text-xs rounded font-medium bg-slate-800 text-slate-400 hover:text-white">💥 Critical Only</button>
+          </div>
+        </div>
+
+        <div class="flex flex-wrap gap-2">
+          <button onclick="window.print()" class="bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-medium px-3 py-2 rounded transition flex items-center gap-1">🖨️ Cetak / Save PDF</button>
+          <button onclick="clearShift()" class="bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-medium px-3 py-2 rounded transition">Reset Shift</button>
+          <button id="btn-copy" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium px-4 py-2 rounded transition flex items-center gap-1">📋 Copy Laporan WA</button>
+        </div>
+      </div>
+
+      <!-- Table Container -->
+      <div class="table-container bg-slate-800 rounded-xl border border-slate-700 overflow-hidden shadow-xl">
+        <table class="w-full text-left text-xs text-slate-300">
+          <thead class="bg-slate-950 text-slate-400 border-b border-slate-700 uppercase sticky top-0 z-10">
+            <tr>
+              <th class="p-3">Waktu</th>
+              <th class="p-3 no-print">Bukti</th>
+              <th class="p-3">Ticket / Device ID</th>
+              <th class="p-3">Problem</th>
+              <th class="p-3">Action</th>
+              <th class="p-3">Sev</th>
+              <th class="p-3">Status</th>
+              <th class="p-3 text-center sticky right-0 bg-slate-950 no-print">Aksi</th>
+            </tr>
+          </thead>
+          <tbody id="log-table-body" class="divide-y divide-slate-700">
+            <!-- Data log -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <!-- MODAL POP-UP PREVIEW FOTO (No Print) -->
+  <div id="image-modal" class="no-print fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="relative max-w-4xl max-h-[90vh] bg-slate-900 border border-slate-700 rounded-xl p-2 shadow-2xl flex flex-col items-center">
+      <button onclick="closeModal()" class="absolute -top-3 -right-3 bg-rose-600 text-white rounded-full w-8 h-8 font-bold hover:bg-rose-500 transition shadow">✕</button>
+      <img id="modal-img-src" src="" alt="Bukti Foto" class="max-w-full max-h-[80vh] object-contain rounded">
+      <p id="modal-caption" class="text-xs text-slate-400 mt-2 font-mono"></p>
+    </div>
+  </div>
+
+  <!-- Supabase JS CDN -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="app.js"></script>
+</body>
+</html>
