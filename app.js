@@ -231,7 +231,7 @@ function renderLogTable() {
     row.innerHTML = `
       <td class="p-3 text-slate-400 font-mono">${item.time}</td>
       <td class="p-3 no-print">${imgPreview}</td>
-      <td class="p-3 text-slate-300"><span class="bg-slate-700/60 px-1.5 py-0.5 rounded text-[10px] border border-slate-600 font-mono">${item.source || 'PRTG'}</span></td>
+      <td class="p-3 text-slate-300 whitespace-nowrap"><span class="bg-slate-700/60 px-2 py-1 rounded text-[10px] border border-slate-600 font-mono whitespace-nowrap">${item.source || 'PRTG'}</span></td>
       <td class="p-3 font-semibold text-slate-200">${item.ticketId}</td>
       <td class="p-3">${item.problem}</td>
       <td class="p-3 text-slate-400">
