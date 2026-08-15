@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>NOC Hub - Incident & Task Management</title>
+  <title>NOC Operations HUB - SOP Standard</title>
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
@@ -31,7 +31,7 @@
     <div class="border-b-2 border-slate-900 pb-2 mb-4 flex justify-between items-center">
       <div>
         <h1 class="text-xl font-bold text-black uppercase">Laporan Harian Operational NOC</h1>
-        <p class="text-xs text-slate-600">Dokumen Resmi Handover & Log Insiden Jaringan</p>
+        <p class="text-xs text-slate-600">Dokumen Resmi Handover & Log Insiden Jaringan Sesuai SOP</p>
       </div>
       <div id="print-date" class="text-xs font-semibold text-slate-700"></div>
     </div>
@@ -43,16 +43,27 @@
     <header class="no-print flex flex-col md:flex-row justify-between items-start md:items-center border-b border-slate-700 pb-4 gap-4">
       <div>
         <h1 class="text-2xl font-bold text-sky-400">NOC Operations HUB</h1>
-        <p class="text-xs text-slate-400">Incident Logs, Long-term Tasks & Scheduled Maintenance</p>
+        <p class="text-xs text-slate-400">PRTG, The Dude, MikroTik Integration & Handover SOP</p>
       </div>
 
-      <div class="flex items-center gap-3">
-        <!-- Navigation Tabs -->
-        <div class="flex bg-slate-800 p-1 rounded-lg border border-slate-700 text-xs">
-          <button id="tab-btn-incidents" onclick="switchMainTab('incidents')" class="px-4 py-2 rounded-md font-semibold bg-sky-600 text-white transition">🚨 Insiden Shift</button>
-          <button id="tab-btn-tasks" onclick="switchMainTab('tasks')" class="px-4 py-2 rounded-md font-semibold text-slate-400 hover:text-white transition">📋 Task & Maintenance</button>
+      <div class="flex flex-wrap items-center gap-3">
+        <!-- Shift & PIC Selector Bar -->
+        <div class="flex items-center gap-2 bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700 text-xs">
+          <label class="text-slate-400">Shift:</label>
+          <select id="shift-select" class="bg-slate-900 text-sky-300 font-semibold rounded px-1.5 py-1 border border-slate-700 focus:outline-none">
+            <option value="Shift 1 (Pagi 07:00 - 15:00)">☀️ Shift 1 (Pagi)</option>
+            <option value="Shift 2 (Siang 15:00 - 23:00)">🌤️ Shift 2 (Siang)</option>
+            <option value="Shift 3 (Malam 23:00 - 07:00)">🌙 Shift 3 (Malam)</option>
+          </select>
+          <input type="text" id="pic-name" placeholder="Nama Petugas..." class="bg-slate-900 text-slate-100 rounded px-2 py-1 border border-slate-700 w-32 focus:outline-none focus:border-sky-500">
         </div>
-        <div id="current-date" class="text-right text-xs font-semibold text-slate-400 hidden sm:block"></div>
+
+        <!-- Navigation Tabs (3 Tabs) -->
+        <div class="flex bg-slate-800 p-1 rounded-lg border border-slate-700 text-xs">
+          <button id="tab-btn-incidents" onclick="switchMainTab('incidents')" class="px-3 py-2 rounded-md font-semibold bg-sky-600 text-white transition">🚨 Insiden Shift</button>
+          <button id="tab-btn-tasks" onclick="switchMainTab('tasks')" class="px-3 py-2 rounded-md font-semibold text-slate-400 hover:text-white transition">📋 Task & Maintenance</button>
+          <button id="tab-btn-history" onclick="switchMainTab('history')" class="px-3 py-2 rounded-md font-semibold text-slate-400 hover:text-white transition">🗄️ History & Arsip</button>
+        </div>
       </div>
     </header>
 
@@ -88,8 +99,18 @@
           <form id="report-form" class="grid grid-cols-1 md:grid-cols-2 gap-4">
             
             <div>
-              <label class="block text-xs text-slate-400 mb-1">Ticket / Device ID</label>
-              <input type="text" id="ticket-id" required placeholder="INC-9082 / Router-Core-01" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-sm text-slate-100 focus:outline-none focus:border-sky-500">
+              <label class="block text-xs text-slate-400 mb-1">Ticket / Device / Node Name</label>
+              <input type="text" id="ticket-id" required placeholder="INC-9082 / CCR1036-POP-BINTARA" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-sm text-slate-100 focus:outline-none focus:border-sky-500">
+            </div>
+
+            <div>
+              <label class="block text-xs text-slate-400 mb-1">Sumber Monitoring (Tool Detection)</label>
+              <select id="monitoring-source" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-sm text-slate-100 focus:outline-none focus:border-sky-500">
+                <option value="PRTG Monitor">📊 PRTG Network Monitor</option>
+                <option value="The Dude Map">🗺️ The Dude Network Map</option>
+                <option value="MikroTik / Winbox">⚙️ MikroTik RouterOS / Winbox</option>
+                <option value="User / Client Report">👤 Laporan Pelanggan / User</option>
+              </select>
             </div>
 
             <div>
@@ -104,20 +125,44 @@
             <div>
               <label class="block text-xs text-slate-400 mb-1">Tingkat Keparahan (Severity)</label>
               <select id="severity" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-sm text-slate-100 focus:outline-none focus:border-sky-500">
-                <option value="Minor">Minor (Info)</option>
-                <option value="Major">Major (Degraded / Lemot)</option>
-                <option value="Critical">Critical (Total Down)</option>
+                <option value="Minor">Minor (Warning / Info)</option>
+                <option value="Major">Major (Degraded / Flap)</option>
+                <option value="Critical">Critical (Total Down / Link Cut)</option>
               </select>
             </div>
 
             <div>
-              <label class="block text-xs text-slate-400 mb-1">Upload Foto Tambahan (File)</label>
+              <label class="block text-xs text-slate-400 mb-1">Status Hasil Verifikasi Monitoring</label>
+              <select id="verification-method" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-sm text-slate-100 focus:outline-none focus:border-sky-500">
+                <optgroup label="🔴 Gangguan Aktif (Tiket OPEN)">
+                  <option value="Winbox: RTO / 100% Packet Loss">🔴 Winbox: RTO / 100% Packet Loss</option>
+                  <option value="PRTG: Sensor Down (Red Alert)">🔴 PRTG: Sensor Down (Red Alert)</option>
+                  <option value="The Dude: Node Down (Red Map)">🔴 The Dude: Node Down (Red Map)</option>
+                  <option value="RouterOS: Interface Down (No Carrier)">🔴 RouterOS: Interface Down (No Carrier)</option>
+                </optgroup>
+                <optgroup label="🟡 Pemantauan (IN PROGRESS)">
+                  <option value="Winbox: High Latency & Partial Loss">🟡 Winbox: High Latency & Partial Loss</option>
+                  <option value="PRTG: Sensor Warning / Flap Traffic">🟡 PRTG: Sensor Warning / Flap Traffic</option>
+                  <option value="The Dude: Link Flapping / Degraded">🟡 The Dude: Link Flapping / Degraded</option>
+                  <option value="Dalam Proses Monitoring Observasi">🟡 Dalam Proses Observasi</option>
+                </optgroup>
+                <optgroup label="🟢 Normal & Pulih (RESOLVED)">
+                  <option value="Winbox: Ping 0% Loss & Latency Stabil" selected>🟢 Winbox: Ping 0% Loss & Latency Stabil</option>
+                  <option value="PRTG: Sensor Up & Traffic Normal">🟢 PRTG: Sensor Up & Traffic Normal</option>
+                  <option value="The Dude: Node Map Green (Up)">🟢 The Dude: Node Map Green (Up)</option>
+                  <option value="RouterOS: Interface Status 'R' (Running)">🟢 RouterOS: Interface Status 'R' (Running)</option>
+                </optgroup>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-xs text-slate-400 mb-1">Upload File Bukti (File Tambahan)</label>
               <input type="file" id="ticket-image" accept="image/*" class="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-xs text-slate-300 focus:outline-none focus:border-sky-500 file:bg-slate-700 file:text-slate-100 file:rounded file:border-0 file:px-2 file:py-1 file:mr-2">
             </div>
 
             <!-- Paste Screenshot Area (Multi) -->
             <div class="md:col-span-2">
-              <label class="block text-xs text-slate-400 mb-1">Tempel Screenshot (Bisa Ctrl + V berkali-kali)</label>
+              <label class="block text-xs text-slate-400 mb-1">Tempel Bukti Screenshot (Grafik PRTG, The Dude, Terminal Winbox - Ctrl + V)</label>
               <div id="paste-area" tabindex="0" class="border-2 border-dashed border-slate-600 rounded-lg p-3 text-center bg-slate-900/50 cursor-pointer hover:border-sky-500 transition focus:outline-none focus:border-sky-500">
                 <p id="paste-placeholder" class="text-xs text-slate-400">
                   Klik area ini lalu tekan <span class="bg-slate-800 text-sky-400 px-1.5 py-0.5 rounded border border-slate-700 font-mono">Ctrl + V</span> untuk menempelkan screenshot
@@ -126,23 +171,53 @@
               </div>
             </div>
 
-            <!-- Input Problem -->
+            <!-- Input Problem + Preset Dropdown Rapi -->
             <div class="md:col-span-2">
               <div class="flex justify-between items-center mb-1">
                 <label class="block text-xs text-slate-400">Masalah (Problem)</label>
-                <div class="flex gap-1 overflow-x-auto">
-                  <button type="button" onclick="setPresetProblem('FO Cut Backbone')" class="text-[10px] bg-slate-700 hover:bg-sky-600 text-slate-300 px-1.5 py-0.5 rounded border border-slate-600 transition">+ FO Cut</button>
-                  <button type="button" onclick="setPresetProblem('Power Failure / PLN Off')" class="text-[10px] bg-slate-700 hover:bg-sky-600 text-slate-300 px-1.5 py-0.5 rounded border border-slate-600 transition">+ Power Fail</button>
-                  <button type="button" onclick="setPresetProblem('High Latency & Packet Loss')" class="text-[10px] bg-slate-700 hover:bg-sky-600 text-slate-300 px-1.5 py-0.5 rounded border border-slate-600 transition">+ High Latency</button>
-                  <button type="button" onclick="setPresetProblem('Router / Switch Unreachable')" class="text-[10px] bg-slate-700 hover:bg-sky-600 text-slate-300 px-1.5 py-0.5 rounded border border-slate-600 transition">+ Device Down</button>
-                </div>
+                <select id="preset-problem-select" onchange="applyProblemPreset(this.value)" class="bg-slate-900 text-sky-400 text-xs border border-slate-700 rounded px-2 py-0.5 focus:outline-none focus:border-sky-500 cursor-pointer">
+                  <option value="">⚡ Pilih Preset Masalah...</option>
+                  <optgroup label="📊 PRTG & The Dude Alerts">
+                    <option value="PRTG Sensor Ping Down / Timeout > 5 Menit">PRTG: Ping Sensor Down</option>
+                    <option value="PRTG High Latency Spike (> 120ms) & Packet Loss">PRTG: High Latency & Loss</option>
+                    <option value="The Dude Map Merah: Node Sub-Station Unreachable">The Dude: Node Merah (Down)</option>
+                    <option value="The Dude Link Flapping (Up/Down berulang kali)">The Dude: Link Flap</option>
+                  </optgroup>
+                  <optgroup label="⚙️ MikroTik / RouterOS">
+                    <option value="MikroTik: Interface SFP/Ethernet link down (No Carrier)">Winbox: Interface Link Down</option>
+                    <option value="MikroTik: BGP Session Idle / Prefix Unreceived">Winbox: BGP Session Down</option>
+                    <option value="MikroTik: High CPU Usage (> 90%) & Traffic Drops">Winbox: High CPU Usage</option>
+                    <option value="MikroTik: PPPoE Server unreachable / auth failure">Winbox: PPPoE Down</option>
+                  </optgroup>
+                  <optgroup label="🌐 Fisik & Daya">
+                    <option value="FO Cut Backbone ruas utama terputus total">FO Cut Backbone</option>
+                    <option value="Redaman FO Dropcore melonjak tinggi (> -28 dBm)">Redaman FO Dropcore Tinggi</option>
+                    <option value="Power Failure PLN Padam di lokasi POP / HUB">PLN Padam / UPS Low</option>
+                  </optgroup>
+                </select>
               </div>
-              <input type="text" id="problem" required placeholder="Contoh: Fiber Cut ruas A-B, Latency High" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-sm text-slate-100 focus:outline-none focus:border-sky-500">
+              <input type="text" id="problem" required placeholder="Pilih preset di atas atau ketik masalah..." class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-sm text-slate-100 focus:outline-none focus:border-sky-500">
             </div>
 
+            <!-- Input Action + Preset Dropdown Rapi -->
             <div class="md:col-span-2">
-              <label class="block text-xs text-slate-400 mb-1">Tindakan (Action Taken)</label>
-              <textarea id="action" rows="2" placeholder="Contoh: Reroute ke link backup, eskalasi ke vendor" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-sm text-slate-100 focus:outline-none focus:border-sky-500"></textarea>
+              <div class="flex justify-between items-center mb-1">
+                <label class="block text-xs text-slate-400">Tindakan (Action Taken)</label>
+                <select id="preset-action-select" onchange="applyActionPreset(this.value)" class="bg-slate-900 text-emerald-400 text-xs border border-slate-700 rounded px-2 py-0.5 focus:outline-none focus:border-emerald-500 cursor-pointer">
+                  <option value="">⚡ Pilih Preset Tindakan...</option>
+                  <optgroup label="⚙️ Routing & Perangkat">
+                    <option value="Reroute traffic ke link backup, verifikasi traffic flow di Winbox Torch">Reroute Backup & Torch</option>
+                    <option value="Restart interface SFP / Hard reboot router dan monitor status 'R'">Restart Interface / SFP</option>
+                    <option value="Clear BGP peer connection & re-advertise prefix list">Clear BGP Connection</option>
+                  </optgroup>
+                  <optgroup label="📞 Eskalasi & Lapangan">
+                    <option value="Eskalasi open tiket ke Provider/Vendor & pantau estimasi RFO">Eskalasi Tiket Vendor</option>
+                    <option value="Dispatch teknisi lapangan untuk cek fisik OTB / OTDR splicing kabel">Dispatch Splicing Fiber</option>
+                    <option value="Koordinasi dengan tim POP untuk start genset backup">Koordinasi Genset POP</option>
+                  </optgroup>
+                </select>
+              </div>
+              <textarea id="action" rows="2" placeholder="Pilih preset tindakan di atas atau tulis tindakan..." class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-sm text-slate-100 focus:outline-none focus:border-sky-500"></textarea>
             </div>
 
             <div class="md:col-span-2 flex justify-end">
@@ -180,8 +255,8 @@
 
           <div class="flex flex-wrap gap-2">
             <button onclick="window.print()" class="bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-medium px-3 py-2 rounded transition flex items-center gap-1">🖨️ Save PDF</button>
-            <button onclick="clearShift()" class="bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-medium px-3 py-2 rounded transition">Reset Shift</button>
-            <button id="btn-copy" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium px-4 py-2 rounded transition flex items-center gap-1">📋 Copy Laporan WA</button>
+            <button onclick="clearShift()" class="bg-rose-950/80 hover:bg-rose-900 border border-rose-800/80 text-rose-300 text-xs font-medium px-3 py-2 rounded transition">🔄 Reset & Arsipkan Shift</button>
+            <button id="btn-copy" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium px-4 py-2 rounded transition flex items-center gap-1">📋 Copy Laporan WA (SOP)</button>
           </div>
         </div>
 
@@ -191,12 +266,13 @@
               <tr>
                 <th class="p-3">Waktu</th>
                 <th class="p-3 no-print">Bukti Foto</th>
-                <th class="p-3">Ticket / ID</th>
+                <th class="p-3">Monitoring Tool</th>
+                <th class="p-3">Ticket / Node ID</th>
                 <th class="p-3">Problem</th>
-                <th class="p-3">Action</th>
+                <th class="p-3">Action & Verifikasi</th>
                 <th class="p-3">Sev</th>
                 <th class="p-3">Status</th>
-                <th class="p-3 text-center sticky right-0 bg-slate-950 no-print">Aksi</th>
+                <th class="p-3 text-center sticky right-0 bg-slate-950 no-print">Aksi Cepat</th>
               </tr>
             </thead>
             <tbody id="log-table-body" class="divide-y divide-slate-700"></tbody>
@@ -241,7 +317,10 @@
           </div>
 
           <div>
-            <label class="block text-xs text-slate-400 mb-1">Tanggal & Waktu Pelaksanaan</label>
+            <div class="flex justify-between items-center mb-1">
+              <label class="block text-xs text-slate-400">Jadwal Pelaksanaan</label>
+              <button type="button" onclick="setNowSchedule()" class="text-[10px] text-amber-400 hover:underline">⏱️ Set Sekarang</button>
+            </div>
             <input type="datetime-local" id="task-schedule" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-sm text-slate-100 focus:outline-none focus:border-amber-500">
           </div>
 
@@ -250,8 +329,13 @@
             <input type="text" id="task-pic" placeholder="Aji / Tim Fiber Optic" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-sm text-slate-100 focus:outline-none focus:border-amber-500">
           </div>
 
-          <div class="flex items-end">
-            <button type="submit" class="w-full bg-amber-600 hover:bg-amber-500 text-white font-medium py-2 rounded text-sm transition shadow-lg">+ Simpan Agenda Task</button>
+          <div>
+            <label class="block text-xs text-slate-400 mb-1">Catatan Tambahan (Optional)</label>
+            <input type="text" id="task-notes" placeholder="Window time 01:00 - 04:00" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-sm text-slate-100 focus:outline-none focus:border-amber-500">
+          </div>
+
+          <div class="md:col-span-3 flex justify-end">
+            <button type="submit" class="bg-amber-600 hover:bg-amber-500 text-white font-medium px-6 py-2 rounded text-sm transition shadow-lg">+ Simpan Agenda Task</button>
           </div>
         </form>
       </section>
@@ -261,7 +345,6 @@
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
           <div>
             <h2 class="text-xl font-bold text-slate-200">Daftar Task & Pemeliharaan</h2>
-            <!-- Task Filter -->
             <div class="flex flex-wrap gap-1.5 mt-2">
               <button onclick="filterTasks('ALL')" id="tfilter-all" class="px-2.5 py-1 text-xs rounded font-medium bg-amber-600 text-white">Semua Task</button>
               <button onclick="filterTasks('SCHEDULED')" id="tfilter-scheduled" class="px-2.5 py-1 text-xs rounded font-medium bg-slate-800 text-slate-400 hover:text-white">📅 Terjadwal</button>
@@ -281,6 +364,7 @@
                 <th class="p-3">Jadwal / Waktu</th>
                 <th class="p-3">Kategori</th>
                 <th class="p-3">Nama Pekerjaan</th>
+                <th class="p-3">Catatan</th>
                 <th class="p-3">PIC</th>
                 <th class="p-3">Status</th>
                 <th class="p-3 text-center sticky right-0 bg-slate-950">Aksi Cepat</th>
@@ -291,6 +375,43 @@
         </div>
       </section>
 
+    </div>
+
+
+    <!-- ==================== TAB 3: MODUL HISTORY & ARSIP ==================== -->
+    <div id="tab-history" class="space-y-6 hidden">
+      <section class="space-y-4">
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+          <div>
+            <h2 class="text-xl font-bold text-slate-200">Arsip Riwayat Pengerjaan NOC</h2>
+            <p class="text-xs text-slate-400">Penyimpanan permanen seluruh insiden yang telah di-reset per shift</p>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-2">
+            <input type="text" id="history-search" oninput="renderHistoryTable()" placeholder="🔍 Cari Tiket / Problem / PIC..." class="bg-slate-800 text-slate-100 rounded px-3 py-1.5 border border-slate-700 text-xs focus:outline-none focus:border-indigo-500 w-64">
+            <button onclick="clearHistoryArchive()" class="bg-rose-950/60 hover:bg-rose-900 border border-rose-800/80 text-rose-300 text-xs px-3 py-1.5 rounded transition">Hapus Semua Arsip</button>
+          </div>
+        </div>
+
+        <div class="table-container bg-slate-800 rounded-xl border border-slate-700 overflow-hidden shadow-xl">
+          <table class="w-full text-left text-xs text-slate-300">
+            <thead class="bg-slate-950 text-slate-400 border-b border-slate-700 uppercase sticky top-0 z-10">
+              <tr>
+                <th class="p-3">Tanggal & Shift</th>
+                <th class="p-3">Petugas</th>
+                <th class="p-3">Bukti Foto</th>
+                <th class="p-3">Source</th>
+                <th class="p-3">Ticket / Device</th>
+                <th class="p-3">Problem</th>
+                <th class="p-3">Action & Verifikasi</th>
+                <th class="p-3">Sev</th>
+                <th class="p-3">Status</th>
+              </tr>
+            </thead>
+            <tbody id="history-table-body" class="divide-y divide-slate-700"></tbody>
+          </table>
+        </div>
+      </section>
     </div>
 
   </div>

@@ -8,27 +8,39 @@ const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 let reports = JSON.parse(localStorage.getItem('noc_reports')) || [];
 let pendingTasks = JSON.parse(localStorage.getItem('noc_pending_tasks')) || [];
 let taskList = JSON.parse(localStorage.getItem('noc_task_list')) || [];
+let historyList = JSON.parse(localStorage.getItem('noc_history_logs')) || [];
 let pastedImagesArray = [];
 let currentFilter = 'ALL';
 let currentTaskFilter = 'ALL';
 
-// --- Tab Switching Logic ---
+// --- Tab Switching Logic (3 Tabs) ---
 function switchMainTab(tab) {
   const tabIncidents = document.getElementById('tab-incidents');
   const tabTasks = document.getElementById('tab-tasks');
+  const tabHistory = document.getElementById('tab-history');
+
   const btnIncidents = document.getElementById('tab-btn-incidents');
   const btnTasks = document.getElementById('tab-btn-tasks');
+  const btnHistory = document.getElementById('tab-btn-history');
+
+  tabIncidents.classList.add('hidden');
+  tabTasks.classList.add('hidden');
+  tabHistory.classList.add('hidden');
+
+  btnIncidents.className = 'px-3 py-2 rounded-md font-semibold text-slate-400 hover:text-white transition';
+  btnTasks.className = 'px-3 py-2 rounded-md font-semibold text-slate-400 hover:text-white transition';
+  btnHistory.className = 'px-3 py-2 rounded-md font-semibold text-slate-400 hover:text-white transition';
 
   if (tab === 'incidents') {
     tabIncidents.classList.remove('hidden');
-    tabTasks.classList.add('hidden');
-    btnIncidents.className = 'px-4 py-2 rounded-md font-semibold bg-sky-600 text-white transition';
-    btnTasks.className = 'px-4 py-2 rounded-md font-semibold text-slate-400 hover:text-white transition';
-  } else {
-    tabIncidents.classList.add('hidden');
+    btnIncidents.className = 'px-3 py-2 rounded-md font-semibold bg-sky-600 text-white transition';
+  } else if (tab === 'tasks') {
     tabTasks.classList.remove('hidden');
-    btnTasks.className = 'px-4 py-2 rounded-md font-semibold bg-amber-600 text-white transition';
-    btnIncidents.className = 'px-4 py-2 rounded-md font-semibold text-slate-400 hover:text-white transition';
+    btnTasks.className = 'px-3 py-2 rounded-md font-semibold bg-amber-600 text-white transition';
+  } else if (tab === 'history') {
+    tabHistory.classList.remove('hidden');
+    btnHistory.className = 'px-3 py-2 rounded-md font-semibold bg-indigo-600 text-white transition';
+    renderHistoryTable();
   }
 }
 
@@ -38,6 +50,7 @@ const prForm = document.getElementById('pr-form');
 const taskForm = document.getElementById('task-form');
 const logTableBody = document.getElementById('log-table-body');
 const taskTableBody = document.getElementById('task-table-body');
+const historyTableBody = document.getElementById('history-table-body');
 const prContainer = document.getElementById('pr-container');
 const pasteArea = document.getElementById('paste-area');
 const pastePlaceholder = document.getElementById('paste-placeholder');
@@ -50,8 +63,30 @@ const modalCaption = document.getElementById('modal-caption');
 const formattedDate = new Date().toLocaleDateString('id-ID', {
   weekday: 'long', year: 'numeric', month: 'short', day: 'numeric'
 });
-document.getElementById('current-date').innerText = formattedDate;
 document.getElementById('print-date').innerText = formattedDate;
+
+// --- APPLY DROPDOWN PRESETS ---
+function applyProblemPreset(val) {
+  if (!val) return;
+  const input = document.getElementById('problem');
+  input.value = val;
+  input.focus();
+  document.getElementById('preset-problem-select').value = '';
+}
+
+function applyActionPreset(val) {
+  if (!val) return;
+  const input = document.getElementById('action');
+  input.value = val;
+  input.focus();
+  document.getElementById('preset-action-select').value = '';
+}
+
+function setNowSchedule() {
+  const now = new Date();
+  now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+  document.getElementById('task-schedule').value = now.toISOString().slice(0, 16);
+}
 
 // --- UPLOAD MULTIPLE SUPABASE ---
 async function uploadMultipleToSupabase(imagesArray) {
@@ -140,7 +175,7 @@ function resetPasteArea() {
 // --- MODAL PREVIEW FOTO ---
 function openModal(imgUrl, ticketId) {
   modalImgSrc.src = imgUrl;
-  modalCaption.innerText = `Bukti Foto: ${ticketId}`;
+  modalCaption.innerText = `Bukti Monitoring / SOP: ${ticketId}`;
   modal.classList.remove('hidden');
 }
 
@@ -152,12 +187,6 @@ function closeModal() {
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') closeModal();
 });
-
-function setPresetProblem(text) {
-  const problemInput = document.getElementById('problem');
-  problemInput.value = text;
-  problemInput.focus();
-}
 
 function updateStats() {
   document.getElementById('stat-total').innerText = reports.length;
@@ -175,7 +204,7 @@ function renderLogTable() {
   if (currentFilter === 'CRITICAL') filtered = reports.filter(r => r.severity === 'Critical');
 
   if (filtered.length === 0) {
-    logTableBody.innerHTML = `<tr><td colspan="8" class="p-4 text-center text-slate-500">Belum ada catatan insiden shift ini.</td></tr>`;
+    logTableBody.innerHTML = `<tr><td colspan="9" class="p-4 text-center text-slate-500">Belum ada catatan insiden shift ini.</td></tr>`;
     return;
   }
 
@@ -202,17 +231,31 @@ function renderLogTable() {
     row.innerHTML = `
       <td class="p-3 text-slate-400 font-mono">${item.time}</td>
       <td class="p-3 no-print">${imgPreview}</td>
+      <td class="p-3 text-slate-300"><span class="bg-slate-700/60 px-1.5 py-0.5 rounded text-[10px] border border-slate-600 font-mono">${item.source || 'PRTG'}</span></td>
       <td class="p-3 font-semibold text-slate-200">${item.ticketId}</td>
       <td class="p-3">${item.problem}</td>
-      <td class="p-3 text-slate-400">${item.action || '-'}</td>
+      <td class="p-3 text-slate-400">
+        <div>${item.action || '-'}</div>
+        <div class="text-[10px] text-emerald-400/90 font-mono mt-0.5">✓ ${item.verification || 'Ping 0% Loss'}</div>
+      </td>
       <td class="p-3"><span class="px-1.5 py-0.5 rounded text-[10px] font-bold border ${sevBadge}">${item.severity}</span></td>
       <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold border ${badgeColor}">${item.status}</span></td>
       <td class="p-3 text-center sticky right-0 bg-slate-800 no-print">
-        <button onclick="deleteReport(${index})" class="text-rose-400 hover:text-rose-300">Hapus</button>
+        <div class="flex items-center justify-center gap-1">
+          ${item.status !== 'RESOLVED' ? `<button onclick="quickResolveIncident(${index})" title="Selesaikan Tiket" class="text-[10px] bg-emerald-600/80 hover:bg-emerald-500 text-white px-2 py-0.5 rounded transition">✓ Resolve</button>` : ''}
+          <button onclick="deleteReport(${index})" class="text-[10px] text-rose-400 hover:text-rose-300 ml-1">Hapus</button>
+        </div>
       </td>
     `;
     logTableBody.appendChild(row);
   });
+}
+
+function quickResolveIncident(index) {
+  reports[index].status = 'RESOLVED';
+  localStorage.setItem('noc_reports', JSON.stringify(reports));
+  renderLogTable();
+  updateStats();
 }
 
 function renderPR() {
@@ -243,7 +286,7 @@ function renderTasks() {
   }
 
   if (filtered.length === 0) {
-    taskTableBody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-500">Belum ada daftar task / maintenance.</td></tr>`;
+    taskTableBody.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-slate-500">Belum ada daftar task / maintenance.</td></tr>`;
     return;
   }
 
@@ -260,12 +303,13 @@ function renderTasks() {
       <td class="p-3 font-mono text-slate-400">${task.schedule ? task.schedule.replace('T', ' ') : 'Fleksibel'}</td>
       <td class="p-3 text-slate-300"><span class="bg-slate-700/60 px-2 py-0.5 rounded text-[10px] border border-slate-600">${task.category}</span></td>
       <td class="p-3 font-semibold text-slate-100">${task.title}</td>
-      <td class="p-3 text-slate-400">${task.pic || '-'}</td>
+      <td class="p-3 text-slate-400 text-[11px]">${task.notes || '-'}</td>
+      <td class="p-3 text-slate-300">${task.pic || '-'}</td>
       <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold border ${statBadge}">${task.status}</span></td>
       <td class="p-3 text-center sticky right-0 bg-slate-800">
         <div class="flex justify-center gap-1">
-          ${task.status !== 'DONE' ? `<button onclick="updateTaskStatus(${idx}, 'DONE')" class="text-[10px] bg-emerald-600/80 hover:bg-emerald-500 text-white px-2 py-1 rounded">✓ Done</button>` : ''}
-          ${task.status === 'SCHEDULED' ? `<button onclick="updateTaskStatus(${idx}, 'IN PROGRESS')" class="text-[10px] bg-sky-600/80 hover:bg-sky-500 text-white px-2 py-1 rounded">Mulai</button>` : ''}
+          ${task.status !== 'DONE' ? `<button onclick="updateTaskStatus(${idx}, 'DONE')" class="text-[10px] bg-emerald-600/80 hover:bg-emerald-500 text-white px-2 py-0.5 rounded">✓ Done</button>` : ''}
+          ${task.status === 'SCHEDULED' ? `<button onclick="updateTaskStatus(${idx}, 'IN PROGRESS')" class="text-[10px] bg-sky-600/80 hover:bg-sky-500 text-white px-2 py-0.5 rounded">Mulai</button>` : ''}
           <button onclick="deleteTask(${idx})" class="text-[10px] text-rose-400 hover:underline ml-1">Hapus</button>
         </div>
       </td>
@@ -285,6 +329,73 @@ function deleteTask(index) {
     taskList.splice(index, 1);
     localStorage.setItem('noc_task_list', JSON.stringify(taskList));
     renderTasks();
+  }
+}
+
+// --- RENDER HISTORY & ARSIP ---
+function renderHistoryTable() {
+  historyTableBody.innerHTML = '';
+  const search = (document.getElementById('history-search')?.value || '').toLowerCase();
+
+  let filtered = historyList;
+  if (search) {
+    filtered = historyList.filter(item => 
+      item.ticketId.toLowerCase().includes(search) ||
+      item.problem.toLowerCase().includes(search) ||
+      (item.source && item.source.toLowerCase().includes(search)) ||
+      (item.pic && item.pic.toLowerCase().includes(search)) ||
+      (item.action && item.action.toLowerCase().includes(search))
+    );
+  }
+
+  if (filtered.length === 0) {
+    historyTableBody.innerHTML = `<tr><td colspan="9" class="p-4 text-center text-slate-500">Belum ada arsip riwayat atau pencarian tidak ditemukan.</td></tr>`;
+    return;
+  }
+
+  filtered.forEach((item) => {
+    let badgeColor = 'border-red-500/30 bg-red-500/10 text-red-400';
+    if (item.status === 'IN PROGRESS') badgeColor = 'border-yellow-500/30 bg-yellow-500/10 text-yellow-400';
+    if (item.status === 'RESOLVED') badgeColor = 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400';
+
+    let sevBadge = 'border-slate-600 bg-slate-700 text-slate-300';
+    if (item.severity === 'Major') sevBadge = 'border-orange-500/50 bg-orange-500/10 text-orange-400';
+    if (item.severity === 'Critical') sevBadge = 'border-rose-600/70 bg-rose-600/10 text-rose-300';
+
+    let imgPreview = `<span class="text-slate-600">-</span>`;
+    if (item.images && item.images.length > 0) {
+      imgPreview = `<div class="flex gap-1 overflow-x-auto max-w-[100px]">`;
+      item.images.forEach((url) => {
+        imgPreview += `<img src="${url}" class="h-7 w-9 object-cover rounded border border-slate-600 cursor-pointer hover:opacity-80 transition" onclick="openModal('${url}', '${item.ticketId}')">`;
+      });
+      imgPreview += `</div>`;
+    }
+
+    const row = document.createElement('tr');
+    row.className = 'hover:bg-slate-750/30 transition';
+    row.innerHTML = `
+      <td class="p-3 text-slate-400 font-mono text-[11px]">${item.archivedDate || '-'} <br><span class="text-sky-400">${item.shift || ''}</span></td>
+      <td class="p-3 text-slate-300">${item.pic || '-'}</td>
+      <td class="p-3">${imgPreview}</td>
+      <td class="p-3 text-slate-400 font-mono text-[10px]">${item.source || 'PRTG'}</td>
+      <td class="p-3 font-semibold text-slate-200">${item.ticketId}</td>
+      <td class="p-3">${item.problem}</td>
+      <td class="p-3 text-slate-400">
+        <div>${item.action || '-'}</div>
+        <div class="text-[10px] text-emerald-400/90 font-mono">✓ ${item.verification || 'Normal'}</div>
+      </td>
+      <td class="p-3"><span class="px-1.5 py-0.5 rounded text-[10px] font-bold border ${sevBadge}">${item.severity}</span></td>
+      <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold border ${badgeColor}">${item.status}</span></td>
+    `;
+    historyTableBody.appendChild(row);
+  });
+}
+
+function clearHistoryArchive() {
+  if (confirm('Hapus seluruh data arsip permanen? Data tidak dapat dikembalikan!')) {
+    historyList = [];
+    localStorage.setItem('noc_history_logs', JSON.stringify(historyList));
+    renderHistoryTable();
   }
 }
 
@@ -319,8 +430,10 @@ reportForm.addEventListener('submit', async (e) => {
     id: Date.now(),
     time: timeStr,
     ticketId: document.getElementById('ticket-id').value,
+    source: document.getElementById('monitoring-source').value,
     status: document.getElementById('status').value,
     severity: document.getElementById('severity').value,
+    verification: document.getElementById('verification-method').value,
     problem: document.getElementById('problem').value,
     action: document.getElementById('action').value,
     images: uploadedUrls
@@ -347,7 +460,8 @@ taskForm.addEventListener('submit', (e) => {
     category: document.getElementById('task-category').value,
     status: document.getElementById('task-status').value,
     schedule: document.getElementById('task-schedule').value,
-    pic: document.getElementById('task-pic').value
+    pic: document.getElementById('task-pic').value,
+    notes: document.getElementById('task-notes').value
   };
 
   taskList.push(newTask);
@@ -383,12 +497,33 @@ function deletePR(index) {
   updateStats();
 }
 
+// --- RESET SHIFT & OTOMATIS ARSIPKAN DATA ---
 function clearShift() {
-  if (confirm('Reset log insiden shift ini? (PR dan Task tidak terhapus)')) {
+  if (reports.length === 0) {
+    alert('Belum ada log insiden shift untuk diarsipkan.');
+    return;
+  }
+
+  if (confirm('Reset dan simpan seluruh insiden shift ini ke Arsip History?')) {
+    const currentShift = document.getElementById('shift-select').value;
+    const currentPic = document.getElementById('pic-name').value || 'Petugas NOC';
+
+    const archivedData = reports.map(item => ({
+      ...item,
+      shift: currentShift,
+      pic: currentPic,
+      archivedDate: `${formattedDate} (${item.time} WIB)`
+    }));
+
+    historyList = [...archivedData, ...historyList];
+    localStorage.setItem('noc_history_logs', JSON.stringify(historyList));
+
     reports = [];
     localStorage.setItem('noc_reports', JSON.stringify(reports));
     renderLogTable();
     updateStats();
+    
+    alert('Shift berhasil di-reset! Semua data telah tersimpan aman di tab History & Arsip.');
   }
 }
 
@@ -402,24 +537,30 @@ function filterTasks(status) {
   renderTasks();
 }
 
-// --- COPY WHATSAPP: INCIDENTS ---
+// --- COPY WHATSAPP: INCIDENTS (SOP STANDARD FORMAT) ---
 document.getElementById('btn-copy').addEventListener('click', () => {
   if (reports.length === 0) { alert('Belum ada log!'); return; }
 
-  let txt = `*NOC DAILY REPORT SHIFT*\n`;
+  const currentShift = document.getElementById('shift-select').value;
+  const currentPic = document.getElementById('pic-name').value || 'Petugas Shift';
+
+  let txt = `*NOC DAILY REPORT - ${currentShift.toUpperCase()}*\n`;
+  txt += `Petugas: ${currentPic}\n`;
   txt += `Tanggal: ${formattedDate}\n`;
   txt += `=====================================\n\n`;
-  txt += `📜 *A. INSIDEN HARI INI*\n`;
+  txt += `📜 *A. INSIDEN & NETWORK MONITORING*\n`;
 
   reports.forEach((item, i) => {
     let stat = item.status === 'RESOLVED' ? '✅' : (item.status === 'IN PROGRESS' ? '⚠️' : '🚨');
     txt += `${i + 1}. *[${stat} ${item.status}]* [${item.severity}] ${item.ticketId}\n`;
     txt += `   • Jam: ${item.time} WIB\n`;
+    txt += `   • Detection: ${item.source || 'PRTG'}\n`;
     txt += `   • Problem: ${item.problem}\n`;
     txt += `   • Action: ${item.action || '-'}\n`;
+    txt += `   • Verification: ${item.verification || 'Normal'}\n`;
     
     if (item.images && item.images.length > 0) {
-      txt += `   • Bukti Foto (${item.images.length}):\n`;
+      txt += `   • Bukti Monitoring (${item.images.length}):\n`;
       item.images.forEach((url, idx) => {
         txt += `     ${idx + 1}. ${url}\n`;
       });
@@ -436,7 +577,7 @@ document.getElementById('btn-copy').addEventListener('click', () => {
   }
 
   navigator.clipboard.writeText(txt).then(() => {
-    alert('Laporan Insiden Harian berhasil di-copy ke Clipboard!');
+    alert('Laporan Insiden Harian (SOP Standard) berhasil di-copy ke Clipboard!');
   });
 });
 
@@ -453,7 +594,9 @@ document.getElementById('btn-copy-tasks').addEventListener('click', () => {
     txt += `${i + 1}. [${icon} ${t.status}] *${t.title}*\n`;
     txt += `   • Kategori: ${t.category}\n`;
     txt += `   • Jadwal: ${t.schedule ? t.schedule.replace('T', ' ') + ' WIB' : 'Fleksibel'}\n`;
-    txt += `   • PIC: ${t.pic || '-'}\n\n`;
+    txt += `   • PIC: ${t.pic || '-'}\n`;
+    if (t.notes) txt += `   • Note: ${t.notes}\n`;
+    txt += `\n`;
   });
 
   navigator.clipboard.writeText(txt).then(() => {
